@@ -268,8 +268,10 @@ if not df_raw.empty:
         lambda x: f'<a href="{x}" target="_blank" style="color: #EA465E; font-weight: bold;">Ver Ticket</a>'
     )
     df_display = df_display.rename(columns={"Casas": "Brands"})
+    df_display["Criacao"] = df_display["Criacao"].dt.strftime("%d/%m/%Y")
+    df_display["Atualizacao"] = df_display["Atualizacao"].dt.strftime("%d/%m/%Y")
     st.write(
-        df_display[["ID", "Criacao", "Solicitante", "Status", "Brands", "Titulo", "Link"]].to_html(escape=False, index=False),
+        df_display[["ID", "Criacao", "Atualizacao", "Solicitante", "Status", "Brands", "Titulo", "Link"]].to_html(escape=False, index=False),
         unsafe_allow_html=True,
     )
 
