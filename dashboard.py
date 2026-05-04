@@ -75,11 +75,12 @@ def load_data():
         if len(df.columns) >= len(expected):
             df.columns = expected + list(df.columns[len(expected):])
 
-        for col in ["Status", "Casas", "Criacao", "Link", "Titulo", "Solicitante", "ID"]:
+        for col in ["Status", "Casas", "Criacao", "Atualizacao", "Link", "Titulo", "Solicitante", "ID"]:
             if col not in df.columns:
                 df[col] = ""
 
         df["Criacao"] = pd.to_datetime(df["Criacao"], format="%d/%m/%Y", errors="coerce")
+        df["Atualizacao"] = pd.to_datetime(df["Atualizacao"], dayfirst=True, errors="coerce")
         df["Status"] = df["Status"].fillna("Sem Status")
         df["Casas"] = df["Casas"].fillna("Sem brand")
         return df
@@ -168,22 +169,39 @@ if not df_raw.empty:
         fig_casas.update_layout(margin=dict(t=30, b=0, l=0, r=0))
         st.plotly_chart(fig_casas, use_container_width=True)
 
-    st.subheader("Tickets por Data de Criação")
-    trend_df = (
+    st.subheader("Criados vs Atualizados por Data")
+    created_daily = (
         df.dropna(subset=["Criacao"])
         .groupby(df["Criacao"].dt.date)
         .size()
-        .reset_index(name="Tickets")
+        .reset_index(name="Quantidade")
         .rename(columns={"Criacao": "Data"})
-        .sort_values("Data")
     )
+    created_daily["Tipo"] = "Criados"
+
+    updated_daily = (
+        df.dropna(subset=["Atualizacao"])
+        .groupby(df["Atualizacao"].dt.date)
+        .size()
+        .reset_index(name="Quantidade")
+        .rename(columns={"Atualizacao": "Data"})
+    )
+    updated_daily["Tipo"] = "Atualizados"
+
+    trend_df = pd.concat([created_daily, updated_daily], ignore_index=True).sort_values("Data")
     if not trend_df.empty:
-        fig_trend = px.line(trend_df, x="Data", y="Tickets", markers=True)
-        fig_trend.update_traces(line_color="#20435C", marker_color="#EA465E")
-        fig_trend.update_layout(margin=dict(t=10, b=0, l=0, r=0), height=300)
+        fig_trend = px.line(
+            trend_df,
+            x="Data",
+            y="Quantidade",
+            color="Tipo",
+            markers=True,
+            color_discrete_map={"Criados": "#20435C", "Atualizados": "#EA465E"},
+        )
+        fig_trend.update_layout(margin=dict(t=10, b=0, l=0, r=0), height=320, legend_title_text="")
         st.plotly_chart(fig_trend, use_container_width=True)
     else:
-        st.info("Sem dados de criação válidos para exibir a linha por data.")
+        st.info("Sem dados válidos de criação/atualização para exibir o gráfico por data.")
 
     # --- TABELA ---
     st.markdown("---")
