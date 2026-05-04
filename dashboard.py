@@ -79,8 +79,16 @@ def load_data():
             if col not in df.columns:
                 df[col] = ""
 
-        df["Criacao"] = pd.to_datetime(df["Criacao"], format="%d/%m/%Y", errors="coerce")
-        df["Atualizacao"] = pd.to_datetime(df["Atualizacao"], dayfirst=True, errors="coerce")
+        def parse_br_date_series(series: pd.Series) -> pd.Series:
+            text = series.fillna("").astype(str).str.strip()
+            extracted = text.str.extract(r"(\d{1,2}/\d{1,2}/\d{4})", expand=False)
+            parsed = pd.to_datetime(extracted, format="%d/%m/%Y", errors="coerce")
+            min_valid = pd.Timestamp("2020-01-01")
+            max_valid = pd.Timestamp.now() + pd.Timedelta(days=1)
+            return parsed.where((parsed >= min_valid) & (parsed <= max_valid))
+
+        df["Criacao"] = parse_br_date_series(df["Criacao"])
+        df["Atualizacao"] = parse_br_date_series(df["Atualizacao"])
         df["Status"] = df["Status"].fillna("Sem Status")
         df["Casas"] = df["Casas"].fillna("Sem brand")
         return df
@@ -223,8 +231,24 @@ if not df_raw.empty:
 
     trend_df = pd.concat([created_daily, updated_daily], ignore_index=True).sort_values("Data")
     if not trend_df.empty:
+        min_data = created_daily["Data"].min() if not created_daily.empty else trend_df["Data"].min()
+        max_data = pd.Timestamp.now().date()
+        full_range = pd.date_range(start=min_data, end=max_data, freq="D").date
+
+        pivot = (
+            trend_df.pivot_table(index="Data", columns="Tipo", values="Quantidade", aggfunc="sum")
+            .reindex(full_range, fill_value=0)
+            .reset_index()
+            .rename(columns={"index": "Data"})
+        )
+        if "Criados" not in pivot.columns:
+            pivot["Criados"] = 0
+        if "Atualizados" not in pivot.columns:
+            pivot["Atualizados"] = 0
+
+        trend_plot = pivot.melt(id_vars="Data", value_vars=["Criados", "Atualizados"], var_name="Tipo", value_name="Quantidade")
         fig_trend = px.line(
-            trend_df,
+            trend_plot,
             x="Data",
             y="Quantidade",
             color="Tipo",
